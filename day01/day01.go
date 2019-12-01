@@ -32,7 +32,7 @@ func main() {
 	fuelNeeded := int64(0)
 	for s.Scan() {
 		moduleMass, _ := strconv.ParseInt(s.Text(), 10, 0)
-		fuelNeeded += calculateFuelPart1(moduleMass)
+		fuelNeeded += computeFuelPart2(moduleMass)
 	}
 	err = s.Err()
 	check(err)
@@ -40,6 +40,14 @@ func main() {
 	fmt.Printf("fuel needed %+v\n", fuelNeeded)
 }
 
-func calculateFuelPart1(quantity int64) int64 {
+func computeFuelPart1(quantity int64) int64 {
 	return quantity/3 - 2
+}
+
+func computeFuelPart2(quantity int64) int64 {
+	fuelNeeded := quantity/3 - 2
+	if fuelNeeded <= 0 {
+		return 0
+	}
+	return fuelNeeded + computeFuelPart2(fuelNeeded)
 }
