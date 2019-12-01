@@ -27,6 +27,11 @@ func openFile(path string) *os.File {
 	return f
 }
 
+type fuelComputation struct {
+	totalFuel    int
+	computations []int
+}
+
 func main() {
 	fptr := flag.String("file", "input.txt", "file path to read from")
 	flag.Parse()
@@ -39,7 +44,8 @@ func main() {
 	fuelNeeded := 0
 	for s.Scan() {
 		moduleMass, _ := strconv.Atoi(s.Text())
-		fuelNeeded += computeFuelPart2(moduleMass)
+		fc := computeFuelPart2(moduleMass, fuelComputation{})
+		fuelNeeded += fc.totalFuel
 	}
 	err := s.Err()
 	check(err)
@@ -47,14 +53,23 @@ func main() {
 	fmt.Printf("fuel needed %+v\n", fuelNeeded)
 }
 
-func computeFuelPart1(quantity int) int {
-	return quantity/3 - 2
+func computeFuelPart1(quantity int, actual fuelComputation) fuelComputation {
+	fuel := quantity/3 - 2
+	return fuelComputation{
+		totalFuel:    fuel,
+		computations: append(actual.computations, fuel)}
 }
 
-func computeFuelPart2(quantity int) int {
-	fuelNeeded := quantity/3 - 2
-	if fuelNeeded <= 0 {
-		return 0
+func computeFuelPart2(quantity int, actual fuelComputation) fuelComputation {
+	fuel := quantity/3 - 2
+	if fuel <= 0 {
+		return fuelComputation{
+			totalFuel:    actual.totalFuel,
+			computations: append(actual.computations, 0)}
 	}
-	return fuelNeeded + computeFuelPart2(fuelNeeded)
+
+	return computeFuelPart2(fuel,
+		fuelComputation{
+			totalFuel:    actual.totalFuel + fuel,
+			computations: append(actual.computations, fuel)})
 }
