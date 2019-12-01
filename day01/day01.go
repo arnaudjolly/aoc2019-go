@@ -15,17 +15,24 @@ func check(err error) {
 	}
 }
 
+func closeFile(f *os.File) {
+	if err := f.Close(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func openFile(path string) *os.File {
+	f, err := os.Open(path)
+	check(err)
+	return f
+}
+
 func main() {
 	fptr := flag.String("file", "input.txt", "file path to read from")
 	flag.Parse()
 
-	f, err := os.Open(*fptr)
-	check(err)
-	defer func() {
-		if err = f.Close(); err != nil {
-			log.Fatal(err)
-		}
-	}()
+	f := openFile(*fptr)
+	defer closeFile(f)
 
 	s := bufio.NewScanner(f)
 
@@ -34,7 +41,7 @@ func main() {
 		moduleMass, _ := strconv.Atoi(s.Text())
 		fuelNeeded += computeFuelPart2(moduleMass)
 	}
-	err = s.Err()
+	err := s.Err()
 	check(err)
 
 	fmt.Printf("fuel needed %+v\n", fuelNeeded)
