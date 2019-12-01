@@ -32,10 +32,14 @@ func main() {
 	fuelNeeded := int64(0)
 	for s.Scan() {
 		moduleMass, _ := strconv.ParseInt(s.Text(), 10, 0)
-		fuelNeeded += moduleMass/3 - 2
+		fuelNeeded += calculateFuelPart1(moduleMass)
 	}
 	err = s.Err()
 	check(err)
 
 	fmt.Printf("fuel needed %+v\n", fuelNeeded)
+}
+
+func calculateFuelPart1(quantity int64) int64 {
+	return quantity/3 - 2
 }
