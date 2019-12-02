@@ -1,38 +1,15 @@
-package main
+package day01
 
 import (
+	"adventofcode2019/common"
 	"bufio"
-	"flag"
-	"fmt"
-	"log"
-	"os"
 	"strconv"
 )
 
-func check(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func closeFile(f *os.File) {
-	if err := f.Close(); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func openFile(path string) *os.File {
-	f, err := os.Open(path)
-	check(err)
-	return f
-}
-
-func main() {
-	fptr := flag.String("file", "input.txt", "file path to read from")
-	flag.Parse()
-
-	f := openFile(*fptr)
-	defer closeFile(f)
+// Run is the entryPoint of this day02 module
+func Run(fileName string) (int, error) {
+	f := common.OpenFile(fileName)
+	defer common.CloseFile(f)
 
 	s := bufio.NewScanner(f)
 
@@ -44,9 +21,11 @@ func main() {
 		fuelNeeded += fc.ComputeFuelPart2(moduleMass)
 	}
 	err := s.Err()
-	check(err)
+	if err != nil {
+		return 0, nil
+	}
 
-	fmt.Printf("fuel needed %+v\n", fuelNeeded)
+	return fuelNeeded, nil
 }
 
 // FuelComputation is a type to contain fuel computation state

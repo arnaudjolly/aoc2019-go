@@ -1,54 +1,33 @@
-package main
+package day02
 
 import (
+	"adventofcode2019/common"
 	"bufio"
 	"errors"
-	"flag"
-	"fmt"
-	"log"
-	"os"
 	"strconv"
 	"strings"
 )
 
-func check(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func closeFile(f *os.File) {
-	if err := f.Close(); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func openFile(path string) *os.File {
-	f, err := os.Open(path)
-	check(err)
-	return f
-}
-
-func main() {
-	objptr := flag.Int("objective", 19690720, "objective to get")
-	fptr := flag.String("file", "input.txt", "file path to read from")
-	flag.Parse()
-
-	objective := *objptr
-
-	f := openFile(*fptr)
-	defer closeFile(f)
+// Run is the entrypoint of day02 exercice
+func Run(objective int, filepath string) (int, error) {
+	f := common.OpenFile(filepath)
+	defer common.CloseFile(f)
 
 	s := bufio.NewScanner(f)
 	s.Scan()
 
 	parts := strings.Split(s.Text(), ",")
-	check(s.Err())
+	err := s.Err()
+	if err != nil {
+		return 0, err
+	}
 
 	seq := make([]int, 0)
 	for _, elt := range parts {
 		code, err := strconv.Atoi(elt)
-		check(err)
+		if err != nil {
+			return 0, err
+		}
 
 		seq = append(seq, code)
 	}
@@ -65,17 +44,17 @@ func main() {
 
 			// do the computation
 			result, err := program.Run()
-			check(err)
+			if err != nil {
+				return 0, nil
+			}
 
 			if result == objective {
-				// print the result
-				fmt.Printf("result (100 * noun + verb) is %v\n", 100*nounAttempt+verbAttempt)
-				return
+				return 100*nounAttempt + verbAttempt, nil
 			}
 		}
 	}
 
-	fmt.Printf("no combination of (noun, verb) allowed to get the objective(%v)!", objective)
+	return 0, errors.New("no combination found to reach the objective: " + string(objective))
 }
 
 // IntCodeProgram contains the input data
