@@ -50,7 +50,7 @@ func main() {
 		seq = append(seq, code)
 	}
 
-	program := IntCodeProgram{code: seq}
+	program := IntCodeProgram{memory: seq}
 
 	// init program
 	program.Init(12, 2)
@@ -65,14 +65,14 @@ func main() {
 
 // IntCodeProgram contains the input data
 type IntCodeProgram struct {
-	code    []int
-	current int
+	memory   []int
+	instrPtr int
 }
 
 // Init the program
-func (p *IntCodeProgram) Init(first, second int) {
-	p.code[1] = first
-	p.code[2] = second
+func (p *IntCodeProgram) Init(noun, verb int) {
+	p.memory[1] = noun
+	p.memory[2] = verb
 }
 
 // Run executes the program
@@ -88,38 +88,38 @@ func (p *IntCodeProgram) Run() (int, error) {
 
 // IsCompleted informs about the completeness of the program
 func (p *IntCodeProgram) IsCompleted() bool {
-	return p.code[p.current] == 99
+	return p.memory[p.instrPtr] == 99
 }
 
 // ExecuteNextInstruction identifies instruction to execute and do it
 func (p *IntCodeProgram) ExecuteNextInstruction() error {
-	switch p.code[p.current] {
+	switch p.memory[p.instrPtr] {
 	case 1:
 		p.ExecuteAdd()
 	case 2:
 		p.ExecuteMultiply()
 	default:
-		return errors.New("unknown opcode: " + string(p.code[p.current]))
+		return errors.New("unknown opcode: " + string(p.memory[p.instrPtr]))
 	}
 	return nil
 }
 
 // ExecuteAdd handles addition opcode
 func (p *IntCodeProgram) ExecuteAdd() {
-	inst := p.code[p.current : p.current+4]
-	p.code[inst[3]] = p.code[inst[1]] + p.code[inst[2]]
-	p.current += 4
+	inst := p.memory[p.instrPtr : p.instrPtr+4]
+	p.memory[inst[3]] = p.memory[inst[1]] + p.memory[inst[2]]
+	p.instrPtr += 4
 }
 
 // ExecuteMultiply handles multiplication opcode
 func (p *IntCodeProgram) ExecuteMultiply() {
-	inst := p.code[p.current : p.current+4]
-	p.code[inst[3]] = p.code[inst[1]] * p.code[inst[2]]
-	p.current += 4
+	inst := p.memory[p.instrPtr : p.instrPtr+4]
+	p.memory[inst[3]] = p.memory[inst[1]] * p.memory[inst[2]]
+	p.instrPtr += 4
 }
 
 // Result is the temporary result of the program if not yet completed
 // or the final result if it is
 func (p *IntCodeProgram) Result() int {
-	return p.code[0]
+	return p.memory[0]
 }
