@@ -30,8 +30,11 @@ func openFile(path string) *os.File {
 }
 
 func main() {
+	objptr := flag.Int("objective", 19690720, "objective to get")
 	fptr := flag.String("file", "input.txt", "file path to read from")
 	flag.Parse()
+
+	objective := *objptr
 
 	f := openFile(*fptr)
 	defer closeFile(f)
@@ -50,20 +53,29 @@ func main() {
 		seq = append(seq, code)
 	}
 
-	// keep the initial sequence safe
-	attempt := make([]int, len(seq))
-	copy(attempt, seq)
+	for nounAttempt := 0; nounAttempt < 100; nounAttempt++ {
+		for verbAttempt := 0; verbAttempt < 100; verbAttempt++ {
+			// keep the initial sequence safe
+			attempt := make([]int, len(seq))
+			copy(attempt, seq)
 
-	// init program
-	program := IntCodeProgram{memory: attempt}
-	program.Init(12, 2)
+			// init program
+			program := IntCodeProgram{memory: attempt}
+			program.Init(nounAttempt, verbAttempt)
 
-	// do the computation
-	result, err := program.Run()
-	check(err)
+			// do the computation
+			result, err := program.Run()
+			check(err)
 
-	// print the result
-	fmt.Printf("result is %v\n", result)
+			if result == objective {
+				// print the result
+				fmt.Printf("result (100 * noun + verb) is %v\n", 100*nounAttempt+verbAttempt)
+				return
+			}
+		}
+	}
+
+	fmt.Printf("no combination of (noun, verb) allowed to get the objective(%v)!", objective)
 }
 
 // IntCodeProgram contains the input data
