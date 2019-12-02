@@ -4,6 +4,7 @@ import (
 	"adventofcode2019/common"
 	"bufio"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -54,7 +55,7 @@ func Run(objective int, filepath string) (int, error) {
 		}
 	}
 
-	return 0, errors.New("no combination found to reach the objective: " + string(objective))
+	return 0, errors.New(fmt.Sprint("no combination found to reach the objective: ", objective))
 }
 
 // IntCodeProgram contains the input data
