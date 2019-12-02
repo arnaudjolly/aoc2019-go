@@ -45,7 +45,7 @@ func Run(objective int, filepath string) (int, error) {
 			// do the computation
 			result, err := program.Run()
 			if err != nil {
-				return 0, nil
+				return 0, err
 			}
 
 			if result == objective {
