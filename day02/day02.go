@@ -50,9 +50,12 @@ func main() {
 		seq = append(seq, code)
 	}
 
-	program := IntCodeProgram{memory: seq}
+	// keep the initial sequence safe
+	attempt := make([]int, len(seq))
+	copy(attempt, seq)
 
 	// init program
+	program := IntCodeProgram{memory: attempt}
 	program.Init(12, 2)
 
 	// do the computation
