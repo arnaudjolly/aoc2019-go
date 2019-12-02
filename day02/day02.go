@@ -39,12 +39,10 @@ func Run(objective int, filepath string) (int, error) {
 			attempt := make([]int, len(seq))
 			copy(attempt, seq)
 
-			// init program
+			// launch a program execution
 			program := IntCodeProgram{memory: attempt}
-			program.Init(nounAttempt, verbAttempt)
+			result, err := program.Run(nounAttempt, verbAttempt)
 
-			// do the computation
-			result, err := program.Run()
 			if err != nil {
 				return 0, err
 			}
@@ -64,14 +62,11 @@ type IntCodeProgram struct {
 	instrPtr int
 }
 
-// Init the program
-func (p *IntCodeProgram) Init(noun, verb int) {
+// Run executes the program
+func (p *IntCodeProgram) Run(noun, verb int) (int, error) {
 	p.memory[1] = noun
 	p.memory[2] = verb
-}
 
-// Run executes the program
-func (p *IntCodeProgram) Run() (int, error) {
 	for !p.IsCompleted() {
 		err := p.ExecuteNextInstruction()
 		if err != nil {
