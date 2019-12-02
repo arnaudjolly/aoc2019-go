@@ -42,51 +42,84 @@ func main() {
 	parts := strings.Split(s.Text(), ",")
 	check(s.Err())
 
-	var program IntCodeProgram = make([]int, len(parts))
-	for idx, elt := range parts {
+	seq := make([]int, 0)
+	for _, elt := range parts {
 		code, err := strconv.Atoi(elt)
 		check(err)
 
-		program[idx] = code
+		seq = append(seq, code)
 	}
+
+	program := IntCodeProgram{code: seq}
 
 	// init program
-	program[1] = 12
-	program[2] = 2
+	program.Init(12, 2)
 
 	// do the computation
-out:
-	for current := 0; current < len(program); current += 4 {
-		instruction := program[current : current+4]
+	result, err := program.Run()
+	check(err)
 
-		switch instruction[0] {
-		case 1:
-			// opcode 1: addition
-			program.Add(instruction)
-		case 2:
-			// opcode 2: multiplication
-			program.Multiply(instruction)
-		case 99:
-			// halt
-			break out
-		default:
-			log.Fatal(errors.New("bad opcode " + string(instruction[0])))
-		}
-	}
-
-	fmt.Printf("result is %v\n", program[0])
+	// print the result
+	fmt.Printf("result is %v\n", result)
 }
 
 // IntCodeProgram contains the input data
-type IntCodeProgram []int
-
-// Add handles addition opcode
-func (p *IntCodeProgram) Add(inst []int) {
-	(*p)[inst[3]] = (*p)[inst[1]] + (*p)[inst[2]]
+type IntCodeProgram struct {
+	code    []int
+	current int
 }
 
-// Multiply handles multiplication opcode
-func (p *IntCodeProgram) Multiply(inst []int) {
-	(*p)[inst[3]] = (*p)[inst[1]] * (*p)[inst[2]]
+// Init the program
+func (p *IntCodeProgram) Init(first, second int) {
+	p.code[1] = first
+	p.code[2] = second
 }
 
+// Run executes the program
+func (p *IntCodeProgram) Run() (int, error) {
+	for !p.IsCompleted() {
+		err := p.ExecuteNextInstruction()
+		if err != nil {
+			return 0, err
+		}
+	}
+	return p.Result(), nil
+}
+
+// IsCompleted informs about the completeness of the program
+func (p *IntCodeProgram) IsCompleted() bool {
+	return p.code[p.current] == 99
+}
+
+// ExecuteNextInstruction identifies instruction to execute and do it
+func (p *IntCodeProgram) ExecuteNextInstruction() error {
+	switch p.code[p.current] {
+	case 1:
+		p.ExecuteAdd()
+	case 2:
+		p.ExecuteMultiply()
+	default:
+		return errors.New("unknown opcode: " + string(p.code[p.current]))
+	}
+	return nil
+}
+
+// ExecuteAdd handles addition opcode
+func (p *IntCodeProgram) ExecuteAdd() {
+	inst := p.code[p.current : p.current+4]
+	p.code[inst[3]] = p.code[inst[1]] + p.code[inst[2]]
+	p.current += 4
+}
+
+// ExecuteMultiply handles multiplication opcode
+func (p *IntCodeProgram) ExecuteMultiply() {
+	inst := p.code[p.current : p.current+4]
+	p.code[inst[3]] = p.code[inst[1]] * p.code[inst[2]]
+	p.current += 4
+}
+
+// Result is the temporary result of the program if not yet completed
+// or the final result if it is
+func (p *IntCodeProgram) Result() int {
+	return p.code[0]
+}
