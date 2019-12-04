@@ -44,12 +44,24 @@ func (v *PasswordValidator) Validate(password int) bool {
 	}
 	v.history = append(v.history, v.count)
 
-	return v.checkResult()
+	return v.checkResultPart2()
 }
 
-func (v *PasswordValidator) checkResult() bool {
+func (v *PasswordValidator) checkResultPart1() bool {
 	for _, l := range v.history {
 		if l >= 2 {
+			// a group with a length >= 2 means it's valid for part 1
+			return true
+		}
+	}
+	return false
+}
+
+func (v *PasswordValidator) checkResultPart2() bool {
+	for _, l := range v.history {
+		if l == 2 {
+			// a group with a length == 2 means it's valid for part 2
+			// as a larger group is not valid anymore
 			return true
 		}
 	}
