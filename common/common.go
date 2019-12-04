@@ -25,3 +25,11 @@ func OpenFile(path string) *os.File {
 	CheckError(err)
 	return f
 }
+
+// AbsInt is the math.Abs for ints
+func AbsInt(i int) int {
+	if i < 0 {
+		return -i
+	}
+	return i
+}
