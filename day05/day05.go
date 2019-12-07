@@ -82,13 +82,88 @@ func (p *IntCodeProgram) ExecuteNextInstruction() error {
 	case 2:
 		p.ExecuteMultiply()
 	case 3:
-		p.ExecuteInput(1)
+		//part1 : p.ExecuteInput(1)
+		//part2 :
+		p.ExecuteInput(5)
 	case 4:
 		p.ExecuteOutput()
+	case 5:
+		p.ExecuteJumpIfTrue()
+	case 6:
+		p.ExecuteJumpIfFalse()
+	case 7:
+		p.ExecuteLessThan()
+	case 8:
+		p.ExecuteEquals()
+
 	default:
-		return errors.New("unknown opcode: " + string(opcode))
+		return errors.New("unknown opcode: " + strconv.Itoa(opcode))
 	}
 	return nil
+}
+
+// ExecuteEquals stores 1 in third if first == second else 0
+func (p *IntCodeProgram) ExecuteEquals() {
+	inst := p.memory[p.instrPtr : p.instrPtr+4]
+	immediateParams := getImmediateParamMap(inst[0])
+
+	firstParam := p.resolveParam(0, inst, immediateParams)
+	secondParam := p.resolveParam(1, inst, immediateParams)
+
+	if firstParam == secondParam {
+		p.memory[inst[3]] = 1
+	} else {
+		p.memory[inst[3]] = 0
+	}
+
+	p.instrPtr += 4
+}
+
+// ExecuteLessThan stores 1 in third if first < second else 0
+func (p *IntCodeProgram) ExecuteLessThan() {
+	inst := p.memory[p.instrPtr : p.instrPtr+4]
+	immediateParams := getImmediateParamMap(inst[0])
+
+	firstParam := p.resolveParam(0, inst, immediateParams)
+	secondParam := p.resolveParam(1, inst, immediateParams)
+
+	if firstParam < secondParam {
+		p.memory[inst[3]] = 1
+	} else {
+		p.memory[inst[3]] = 0
+	}
+
+	p.instrPtr += 4
+}
+
+// ExecuteJumpIfTrue jump to firstParam if non-zero
+func (p *IntCodeProgram) ExecuteJumpIfTrue() {
+	inst := p.memory[p.instrPtr : p.instrPtr+3]
+	immediateParams := getImmediateParamMap(inst[0])
+
+	firstParam := p.resolveParam(0, inst, immediateParams)
+	secondParam := p.resolveParam(1, inst, immediateParams)
+
+	if firstParam != 0 {
+		p.instrPtr = secondParam
+	} else {
+		p.instrPtr += 3
+	}
+}
+
+// ExecuteJumpIfFalse jump to firstParam if zero
+func (p *IntCodeProgram) ExecuteJumpIfFalse() {
+	inst := p.memory[p.instrPtr : p.instrPtr+3]
+	immediateParams := getImmediateParamMap(inst[0])
+
+	firstParam := p.resolveParam(0, inst, immediateParams)
+	secondParam := p.resolveParam(1, inst, immediateParams)
+
+	if firstParam == 0 {
+		p.instrPtr = secondParam
+	} else {
+		p.instrPtr += 3
+	}
 }
 
 // ExecuteInput simulate a "read" and insert i at the address coming next
@@ -103,12 +178,7 @@ func (p *IntCodeProgram) ExecuteOutput() {
 	inst := p.memory[p.instrPtr : p.instrPtr+2]
 	immediateParams := getImmediateParamMap(inst[0])
 
-	var firstParam int
-	if immediateParams[0] {
-		firstParam = inst[1]
-	} else {
-		firstParam = p.memory[inst[1]]
-	}
+	firstParam := p.resolveParam(0, inst, immediateParams)
 
 	p.output = append(p.output, firstParam)
 	p.instrPtr += 2
@@ -119,19 +189,8 @@ func (p *IntCodeProgram) ExecuteAdd() {
 	inst := p.memory[p.instrPtr : p.instrPtr+4]
 	immediateParams := getImmediateParamMap(inst[0])
 
-	var firstParam int
-	if immediateParams[0] {
-		firstParam = inst[1]
-	} else {
-		firstParam = p.memory[inst[1]]
-	}
-
-	var secondParam int
-	if immediateParams[1] {
-		secondParam = inst[2]
-	} else {
-		secondParam = p.memory[inst[2]]
-	}
+	firstParam := p.resolveParam(0, inst, immediateParams)
+	secondParam := p.resolveParam(1, inst, immediateParams)
 
 	p.memory[inst[3]] = firstParam + secondParam
 	p.instrPtr += 4
@@ -153,19 +212,8 @@ func (p *IntCodeProgram) ExecuteMultiply() {
 	inst := p.memory[p.instrPtr : p.instrPtr+4]
 	immediateParams := getImmediateParamMap(inst[0])
 
-	var firstParam int
-	if immediateParams[0] {
-		firstParam = inst[1]
-	} else {
-		firstParam = p.memory[inst[1]]
-	}
-
-	var secondParam int
-	if immediateParams[1] {
-		secondParam = inst[2]
-	} else {
-		secondParam = p.memory[inst[2]]
-	}
+	firstParam := p.resolveParam(0, inst, immediateParams)
+	secondParam := p.resolveParam(1, inst, immediateParams)
 
 	p.memory[inst[3]] = firstParam * secondParam
 	p.instrPtr += 4
@@ -175,4 +223,11 @@ func (p *IntCodeProgram) ExecuteMultiply() {
 // or the final result if it is
 func (p *IntCodeProgram) Result() int {
 	return p.memory[0]
+}
+
+func (p *IntCodeProgram) resolveParam(i int, instruction []int, modes map[int]bool) int {
+	if modes[i] {
+		return instruction[i+1]
+	}
+	return p.memory[instruction[i+1]]
 }
