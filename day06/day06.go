@@ -40,9 +40,39 @@ func Run(filepath string) (int, error) {
 		return 0, nil
 	}
 
-	result := part1(space)
+	result := part2(space)
 
 	return result, nil
+}
+
+// compute number of orbital transfer we need to orbit directly around Santa is orbiting aroung
+func part2(space Space) int {
+	ours := space.parents("YOU")
+	fmt.Printf("ours: %v\n", ours)
+	his := space.parents("SAN")
+	fmt.Printf("santa's: %v\n", his)
+
+	var innerLoopSlice []string
+	var outerLoopSlice []string
+	if len(ours) < len(his) {
+		innerLoopSlice = ours
+		outerLoopSlice = his
+	} else {
+		innerLoopSlice = his
+		outerLoopSlice = ours
+	}
+
+	for i := 0; i < len(outerLoopSlice); i++ {
+		revIdx := len(outerLoopSlice) - 1 - i
+		for j := 0; j < len(innerLoopSlice); j++ {
+			revJdx := len(innerLoopSlice) - 1 - j
+			if outerLoopSlice[revIdx] == innerLoopSlice[revJdx] {
+				return i + j
+			}
+		}
+	}
+
+	return -1
 }
 
 func part1(space Space) int {
@@ -100,4 +130,13 @@ func (space Space) indirectOrbits(o string, cache *map[string]int) int {
 	indirectOfParent := space.indirectOrbits(infos.parentName, cache)
 	(*cache)[infos.parentName] = indirectOfParent
 	return 1 + indirectOfParent
+}
+
+func (space Space) parents(o string) []string {
+	infos := space[o]
+	if infos.parentName == "" {
+		return make([]string, 0)
+	}
+
+	return append(space.parents(infos.parentName), infos.parentName)
 }
