@@ -4,9 +4,10 @@ import (
 	"adventofcode2019/common"
 	"bufio"
 	"errors"
-	"gonum.org/v1/gonum/stat/combin"
 	"strconv"
 	"strings"
+
+	"gonum.org/v1/gonum/stat/combin"
 )
 
 // Run is the entrypoint of day07 exercice
@@ -41,63 +42,70 @@ func Run(filepath string) (int, error) {
 	for gen.Next() {
 		perm := gen.Permutation(nil)
 
-		amplifiers := []IntCodeProgram{
-			createProgram(perm[0]),
-			createProgram(perm[1]),
-			createProgram(perm[2]),
-			createProgram(perm[3]),
-			createProgram(perm[4]),
+		amplifiers := []*IntCodeProgram{
+			createProgram("A", perm[0]+5),
+			createProgram("B", perm[1]+5),
+			createProgram("C", perm[2]+5),
+			createProgram("D", perm[3]+5),
+			createProgram("E", perm[4]+5),
 		}
 
 		whatToPassAsSecondInput := 0
-
-		for _, amplifier := range amplifiers {
-			next, err := amplifier.Run(whatToPassAsSecondInput)
-			if err != nil {
-				return 0, err
+		amplifierHalted := make(map[int]bool)
+		for len(amplifierHalted) < len(amplifiers) {
+			for idx, amplifier := range amplifiers {
+				next, halted, err := amplifier.Run(whatToPassAsSecondInput)
+				if err != nil {
+					return 0, err
+				}
+				if halted {
+					amplifierHalted[idx] = true
+				}
+				whatToPassAsSecondInput = next
 			}
-			whatToPassAsSecondInput = next
 		}
-
 		if whatToPassAsSecondInput > result {
 			result = whatToPassAsSecondInput
 		}
-
 	}
 
 	return result, nil
 }
 
-func programCreator(state []int) func(int) IntCodeProgram {
+func programCreator(state []int) func(string, int) *IntCodeProgram {
 	// keep the initial sequence safe
-	attempt := make([]int, len(state))
-	copy(attempt, state)
+	safeBackup := make([]int, len(state))
+	copy(safeBackup, state)
 
-	return func(phase int) IntCodeProgram {
-		return IntCodeProgram{memory: attempt, input: []int{phase}}
+	return func(name string, phase int) *IntCodeProgram {
+		attempt := make([]int, len(safeBackup))
+		copy(attempt, safeBackup)
+		return &IntCodeProgram{name: name, memory: attempt, input: []int{phase}}
 	}
 }
 
 // IntCodeProgram contains the input data
 type IntCodeProgram struct {
-	memory   []int
-	instrPtr int
-	input    []int
-	output   []int
-	halted   bool
+	name      string
+	memory    []int
+	instrPtr  int
+	input     []int
+	output    []int
+	newOutput bool
+	halted    bool
 }
 
 // Run executes the program
-func (p *IntCodeProgram) Run(nextInput int) (int, error) {
+func (p *IntCodeProgram) Run(nextInput int) (int, bool, error) {
 	p.input = append(p.input, nextInput)
-	p.output = p.output[:0]
-	for !p.halted && len(p.output) == 0 {
+	p.newOutput = false
+	for !p.halted && !p.newOutput {
 		err := p.ExecuteNextInstruction()
 		if err != nil {
-			return 0, err
+			return 0, false, err
 		}
 	}
-	return p.Result(), nil
+	return p.Result(), p.halted, nil
 }
 
 // IsCompleted informs about the completeness of the program
@@ -214,6 +222,7 @@ func (p *IntCodeProgram) ExecuteOutput() {
 	firstParam := p.resolveParam(0, inst, immediateParams)
 
 	p.output = append(p.output, firstParam)
+	p.newOutput = true
 	p.instrPtr += 2
 }
 
@@ -254,10 +263,7 @@ func (p *IntCodeProgram) ExecuteMultiply() {
 
 // Result is the output or the first memory address content if no output
 func (p *IntCodeProgram) Result() int {
-	if len(p.output) == 0 {
-		return p.memory[0]
-	}
-	return p.output[0]
+	return p.output[len(p.output)-1]
 }
 
 func (p *IntCodeProgram) resolveParam(i int, instruction []int, modes map[int]bool) int {
