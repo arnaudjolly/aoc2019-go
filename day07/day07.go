@@ -41,17 +41,22 @@ func Run(filepath string) (int, error) {
 	for gen.Next() {
 		perm := gen.Permutation(nil)
 
+		amplifiers := []IntCodeProgram{
+			createProgram(perm[0]),
+			createProgram(perm[1]),
+			createProgram(perm[2]),
+			createProgram(perm[3]),
+			createProgram(perm[4]),
+		}
+
 		whatToPassAsSecondInput := 0
-		for _, phase := range perm {
-			program := createProgram([]int{phase, whatToPassAsSecondInput})
-			_, err := program.Run()
+
+		for _, amplifier := range amplifiers {
+			next, err := amplifier.Run(whatToPassAsSecondInput)
 			if err != nil {
 				return 0, err
 			}
-			whatToPassAsSecondInput = program.output[0]
-		}
-		if err != nil {
-			return 0, err
+			whatToPassAsSecondInput = next
 		}
 
 		if whatToPassAsSecondInput > result {
@@ -63,13 +68,13 @@ func Run(filepath string) (int, error) {
 	return result, nil
 }
 
-func programCreator(state []int) func([]int) IntCodeProgram {
+func programCreator(state []int) func(int) IntCodeProgram {
 	// keep the initial sequence safe
 	attempt := make([]int, len(state))
 	copy(attempt, state)
 
-	return func(input []int) IntCodeProgram {
-		return IntCodeProgram{memory: attempt, input: input}
+	return func(phase int) IntCodeProgram {
+		return IntCodeProgram{memory: attempt, input: []int{phase}}
 	}
 }
 
@@ -79,11 +84,14 @@ type IntCodeProgram struct {
 	instrPtr int
 	input    []int
 	output   []int
+	halted   bool
 }
 
 // Run executes the program
-func (p *IntCodeProgram) Run() (int, error) {
-	for !p.IsCompleted() {
+func (p *IntCodeProgram) Run(nextInput int) (int, error) {
+	p.input = append(p.input, nextInput)
+	p.output = p.output[:0]
+	for !p.halted && len(p.output) == 0 {
 		err := p.ExecuteNextInstruction()
 		if err != nil {
 			return 0, err
@@ -118,7 +126,8 @@ func (p *IntCodeProgram) ExecuteNextInstruction() error {
 		p.ExecuteLessThan()
 	case 8:
 		p.ExecuteEquals()
-
+	case 99:
+		p.halted = true
 	default:
 		return errors.New("unknown opcode: " + strconv.Itoa(opcode))
 	}
@@ -243,10 +252,12 @@ func (p *IntCodeProgram) ExecuteMultiply() {
 	p.instrPtr += 4
 }
 
-// Result is the temporary result of the program if not yet completed
-// or the final result if it is
+// Result is the output or the first memory address content if no output
 func (p *IntCodeProgram) Result() int {
-	return p.memory[0]
+	if len(p.output) == 0 {
+		return p.memory[0]
+	}
+	return p.output[0]
 }
 
 func (p *IntCodeProgram) resolveParam(i int, instruction []int, modes map[int]bool) int {
