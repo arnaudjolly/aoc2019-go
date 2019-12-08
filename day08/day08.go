@@ -22,6 +22,12 @@ func Run(fileName string) (int, error) {
 	height := 6
 	width := 25
 
+	result := part1(digits, width, height)
+
+	return result, nil
+}
+
+func part1(digits string, width, height int) int {
 	minZeroes := 25
 	var resultLayer string
 
@@ -49,7 +55,8 @@ func Run(fileName string) (int, error) {
 			nbOf2++
 		}
 	}
-	return nbOf1 * nbOf2, nil
+
+	return nbOf1 * nbOf2
 }
 
 func layers(s string, width, height int) []string {
