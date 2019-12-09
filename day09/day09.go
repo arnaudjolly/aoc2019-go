@@ -35,7 +35,9 @@ func Run(filepath string) (int, error) {
 	}
 	createProgram := programCreator(seq)
 
-	p := createProgram(1)
+	// part2 ask to run it with 2 as input
+	p := createProgram(2)
+	// the 0 in the Run(x) is not needed if program has only one "input"
 	next, output, err := p.Run(0)
 	if err != nil {
 		return 0, err
