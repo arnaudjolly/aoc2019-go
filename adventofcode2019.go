@@ -23,6 +23,10 @@ func main() {
 	startptr := flag.Int("start", 123257, "start of day04 range")
 	endptr := flag.Int("end", 647015, "end of day04 range")
 
+	// specific for day08
+	widthptr := flag.Int("width", 25, "width of layer")
+	heightptr := flag.Int("height", 6, "height of layer")
+
 	// common flags
 	fptr := flag.String("file", "input.txt", "file path to read from")
 	dayptr := flag.Int("day", 8, "run the solution for day XX")
@@ -57,7 +61,7 @@ func main() {
 		common.CheckError(err)
 		shareResult(result)
 	case 8:
-		result, err := day08.Run(*fptr)
+		result, err := day08.Run(*fptr, *widthptr, *heightptr)
 		common.CheckError(err)
 		shareResult(result)
 	}

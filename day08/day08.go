@@ -3,10 +3,11 @@ package day08
 import (
 	"adventofcode2019/common"
 	"bufio"
+	"fmt"
 )
 
 // Run is the entrypoint of day08 exercice
-func Run(fileName string) (int, error) {
+func Run(fileName string, width, height int) (int, error) {
 	f := common.OpenFile(fileName)
 	defer common.CloseFile(f)
 
@@ -19,12 +20,48 @@ func Run(fileName string) (int, error) {
 		return 0, err
 	}
 
-	height := 6
-	width := 25
-
-	result := part1(digits, width, height)
+	result := part2(digits, width, height)
 
 	return result, nil
+}
+
+func part2(digits string, width, height int) int {
+	layers := layers(digits, width, height)
+
+	var resultImage string
+
+	for i := 0; i < len(layers); i++ {
+		resultImage = reduceLayer(resultImage, layers[i])
+	}
+
+	fmt.Println("Final result:")
+	showPicture(resultImage, width, height)
+	return 0
+}
+
+func reduceLayer(topLayer, backLayer string) string {
+	if len(topLayer) == 0 {
+		return backLayer
+	}
+
+	result := make([]byte, len(backLayer))
+	for idx, pixel := range topLayer {
+		switch pixel {
+		case '0':
+			result[idx] = '0'
+		case '1':
+			result[idx] = '1'
+		case '2':
+			result[idx] = backLayer[idx]
+		}
+	}
+	return string(result)
+}
+
+func showPicture(layer string, width, height int) {
+	for r := 0; r < len(layer)/width; r++ {
+		fmt.Println(layer[r*width : (r+1)*width])
+	}
 }
 
 func part1(digits string, width, height int) int {
