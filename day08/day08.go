@@ -4,6 +4,7 @@ import (
 	"adventofcode2019/common"
 	"bufio"
 	"fmt"
+	"strings"
 )
 
 // Run is the entrypoint of day08 exercice
@@ -59,8 +60,10 @@ func reduceLayer(topLayer, backLayer string) string {
 }
 
 func showPicture(layer string, width, height int) {
-	for r := 0; r < len(layer)/width; r++ {
-		fmt.Println(layer[r*width : (r+1)*width])
+	moreVisible := strings.ReplaceAll(layer, "0", " ")
+	moreVisible = strings.ReplaceAll(moreVisible, "1", "@")
+	for r := 0; r < len(moreVisible)/width; r++ {
+		fmt.Println(moreVisible[r*width : (r+1)*width])
 	}
 }
 
@@ -99,7 +102,12 @@ func part1(digits string, width, height int) int {
 func layers(s string, width, height int) []string {
 	result := make([]string, 0)
 	for layer := 0; layer < len(s)/(width*height); layer++ {
-		result = append(result, s[layer*width*height:(layer+1)*width*height])
+		start := layer * width * height
+		end := (layer + 1) * width * height
+		if end > len(s) {
+			end = len(s)
+		}
+		result = append(result, s[start:end])
 	}
 	return result
 }
