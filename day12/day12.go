@@ -31,13 +31,35 @@ func Run(fileName string, steps, describeEvery int) (int, error) {
 		return 0, nil
 	}
 
-	describe(ch, 0)
-	part1(ch, steps, describeEvery)
+	// each axis is independant
+	// find the revolution for each one and compute the lcm of those 3 values to find a match without iterating each possibility
+	xRevolution := findRevolution(ch, func(pv positionAndVelocity) int { return pv.pos.x }, func(pv positionAndVelocity) int { return pv.vel.x })
+	yRevolution := findRevolution(ch, func(pv positionAndVelocity) int { return pv.pos.y }, func(pv positionAndVelocity) int { return pv.vel.y })
+	zRevolution := findRevolution(ch, func(pv positionAndVelocity) int { return pv.pos.z }, func(pv positionAndVelocity) int { return pv.vel.z })
 
-	totalEnergy := ch.totalEnergy()
-	fmt.Printf("Total energy after %v steps: %v\n", steps, totalEnergy)
+	result := common.Lcm3(xRevolution, yRevolution, zRevolution)
 
-	return totalEnergy, nil
+	return result, nil
+}
+
+func findRevolution(ch challenge, posVelToPosComponent func(positionAndVelocity) int, posVelToVelComponent func(positionAndVelocity) int) int {
+	chCopy := ch.copy()
+	velIntsOrig := ch.mapf(posVelToVelComponent)
+	posIntsOrig := ch.mapf(posVelToPosComponent)
+
+	for step := 1; ; step++ {
+		chCopy.computeVelocities()
+		chCopy.applyVelocities()
+
+		velIntsCopy := chCopy.mapf(posVelToVelComponent)
+		posIntsCopy := chCopy.mapf(posVelToPosComponent)
+		velCheck := common.SliceIntEquals(velIntsOrig, velIntsCopy)
+		posCheck := common.SliceIntEquals(posIntsOrig, posIntsCopy)
+
+		if velCheck && posCheck {
+			return step
+		}
+	}
 }
 
 func part1(ch challenge, steps, describeEvery int) {
@@ -59,6 +81,24 @@ func describe(chal challenge, step int) {
 
 type challenge struct {
 	moons []*positionAndVelocity
+}
+
+func (ch *challenge) mapf(f func(positionAndVelocity) int) []int {
+	result := make([]int, len(ch.moons))
+	for idx, moon := range ch.moons {
+		result[idx] = f(*moon)
+	}
+	return result
+}
+
+func (ch *challenge) copy() *challenge {
+	moonsCopy := make([]*positionAndVelocity, len(ch.moons))
+
+	for idx, moon := range ch.moons {
+		moonsCopy[idx] = &positionAndVelocity{moon.pos, moon.vel}
+	}
+	result := &challenge{moonsCopy}
+	return result
 }
 
 func (ch *challenge) computeVelocities() {
