@@ -13,6 +13,7 @@ import (
 	"adventofcode2019/day09"
 	"adventofcode2019/day10"
 	"adventofcode2019/day11"
+	"adventofcode2019/day12"
 	"flag"
 	"fmt"
 )
@@ -30,9 +31,13 @@ func main() {
 	widthptr := flag.Int("width", 25, "width of layer")
 	heightptr := flag.Int("height", 6, "height of layer")
 
+	// specific for day12
+	stepsptr := flag.Int("steps", 10, "nb of steps")
+	intervalptr := flag.Int("interval", 1, "describe state every X step")
+
 	// common flags
 	fptr := flag.String("file", "input.txt", "file path to read from")
-	dayptr := flag.Int("day", 11, "run the solution for day XX")
+	dayptr := flag.Int("day", 12, "run the solution for day XX")
 	flag.Parse()
 
 	switch *dayptr {
@@ -77,6 +82,10 @@ func main() {
 		fmt.Printf("Coordinates: %v, %v\n", x, y)
 	case 11:
 		result, err := day11.Run(*fptr)
+		common.CheckError(err)
+		shareResult(result)
+	case 12:
+		result, err := day12.Run(*fptr, *stepsptr, *intervalptr)
 		common.CheckError(err)
 		shareResult(result)
 	}
