@@ -37,42 +37,102 @@ func Run(filepath string) (int, error) {
 
 	createProgram := programCreator(seq)
 	p := createProgram()
+	// init quarters
+	p.SetMemory(0, 2)
+
+	g := game{grid: make(map[point]tile)}
+
+	in := make(chan int)
 	out := make(chan int)
+	quit := make(chan int)
+	go p.Run(in, out, quit)
 
-	c := challenge{grid: make(map[point]tile)}
-
-	go p.Run(nil, out)
-
-	for !p.halted {
-		x, y, t := <-out, <-out, tile(<-out)
-		c.placeTile(x, y, t)
+	for run := true; run; {
+		select {
+		case x := <-out:
+			y, info := <-out, <-out
+			fmt.Printf("received: %v, %v, %v\n", x, y, tile(info))
+			if x == -1 && y == 0 {
+				// we receive the score once the entire board is loaded
+				// so it starts the game, we can send the first joystick move
+				// once loaded, don't send a move at score reception but when
+				// receiving new position of ball
+				if !g.loaded {
+					sendMove(g, in)
+				}
+				g.setScore(info)
+			} else {
+				t := tile(info)
+				g.placeTile(x, y, t)
+				// if we receive a ball position and the game is loaded...
+				// send a move
+				if t == ball && g.loaded {
+					sendMove(g, in)
+				}
+			}
+		case <-quit:
+			run = false
+		}
 	}
 
-	c.printGrid()
+	g.printGrid()
 
-	blocks := c.count(isBlock)
+	blocks := g.count(isBlock)
 
 	return blocks, nil
 }
 
+func sendMove(g game, in chan int) {
+	joystickMove := g.guessPaddleMove()
+	fmt.Printf("Move: %v\n", joystickMove)
+	go func() {
+		in <- int(joystickMove)
+	}()
+}
+
 var (
-	bgW = col.New(col.BgWhite, col.FgBlack)
-	bgB = col.New(col.BgBlack, col.FgWhite)
-	bgR = col.New(col.BgRed, col.FgBlack)
+	bgW  = col.New(col.BgWhite, col.FgBlack)
+	bgB  = col.New(col.BgBlack, col.FgWhite)
+	bgR  = col.New(col.BgRed, col.FgBlack)
+	blue = col.New(col.FgBlue)
 )
 
-type challenge struct {
-	grid map[point]tile
+type game struct {
+	grid   map[point]tile
+	score  int
+	ball   point
+	paddle point
+	loaded bool
 }
 
-func (c *challenge) placeTile(x, y int, t tile) {
+func (g *game) setScore(score int) {
+	g.score = score
+	g.loaded = true
+}
+
+func (g *game) placeTile(x, y int, t tile) {
 	p := point{x, y}
-	c.grid[p] = t
+	g.grid[p] = t
+	if t == ball {
+		g.ball = p
+	}
+	if t == hpaddle {
+		g.paddle = p
+	}
 }
 
-func (c *challenge) count(tileFilter func(tile) bool) int {
+func (g *game) guessPaddleMove() joystick {
+	if g.ball.x < g.paddle.x {
+		return left
+	} else if g.ball.x > g.paddle.x {
+		return right
+	}
+	return neutral
+}
+
+func (g *game) count(tileFilter func(tile) bool) int {
 	result := 0
-	for _, t := range c.grid {
+	for _, t := range g.grid {
 		if tileFilter(t) {
 			result++
 		}
@@ -80,12 +140,12 @@ func (c *challenge) count(tileFilter func(tile) bool) int {
 	return result
 }
 
-func (c *challenge) printGrid() {
+func (g *game) printGrid() {
 	fmt.Println("Grid:")
 	minX, maxX := 1, -1
 	minY, maxY := 1, -1
 
-	for p := range c.grid {
+	for p := range g.grid {
 		if p.x > maxX {
 			maxX = p.x
 		}
@@ -103,7 +163,7 @@ func (c *challenge) printGrid() {
 	for y := minY; y <= maxY; y++ {
 		for x := minX; x <= maxX; x++ {
 			p := point{x, y}
-			tile, found := c.grid[p]
+			tile, found := g.grid[p]
 			if !found {
 				tile = empty
 			}
@@ -111,6 +171,8 @@ func (c *challenge) printGrid() {
 		}
 		fmt.Printf("\n")
 	}
+
+	fmt.Printf("Score: %v\n", blue.Sprint(g.score))
 }
 
 type tile int
@@ -142,6 +204,27 @@ const (
 
 func isBlock(t tile) bool { return t == block }
 
+type joystick int
+
+func (j joystick) String() string {
+	switch j {
+	case neutral:
+		return "neutral"
+	case left:
+		return "left"
+	case right:
+		return "right"
+	default:
+		return bgR.Sprintf("unknown(%v)", int(j))
+	}
+}
+
+const (
+	neutral = joystick(0)
+	left    = joystick(-1)
+	right   = joystick(1)
+)
+
 type point struct {
 	x int
 	y int
@@ -171,7 +254,7 @@ type IntCodeProgram struct {
 }
 
 // Run executes the program
-func (p *IntCodeProgram) Run(in, out chan int) error {
+func (p *IntCodeProgram) Run(in, out, quit chan int) error {
 	p.input = in
 	p.output = out
 
@@ -181,6 +264,7 @@ func (p *IntCodeProgram) Run(in, out chan int) error {
 			return err
 		}
 	}
+	quit <- 0
 	return nil
 }
 
