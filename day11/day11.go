@@ -43,6 +43,8 @@ func Run(filepath string) (int, error) {
 	out := make(chan int)
 
 	c := challenge{grid: make(map[point]color)}
+	// part2 says we start on a white panel
+	c.grid[point{}] = white
 
 	go p.Run(in, out)
 
