@@ -33,3 +33,20 @@ func AbsInt(i int) int {
 	}
 	return i
 }
+
+// Gcd is Greatest common divisor
+func Gcd(a, b int) int {
+	if a == 0 {
+		return b
+	}
+	if b == 0 {
+		return a
+	}
+
+	for {
+		if a%b == 0 {
+			return b
+		}
+		a, b = b, a%b
+	}
+}

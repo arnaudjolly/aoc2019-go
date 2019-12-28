@@ -153,21 +153,10 @@ func (c Coord) reduce() Coord {
 	} else if c.x != 0 && c.y == 0 {
 		result = Coord{c.x / common.AbsInt(c.x), c.y}
 	} else {
-		gcd := gcd(common.AbsInt(c.x), common.AbsInt(c.y))
+		gcd := common.Gcd(common.AbsInt(c.x), common.AbsInt(c.y))
 		result = Coord{c.x / gcd, c.y / gcd}
 	}
 	return result
-}
-
-func gcd(nb1 int, nb2 int) int {
-	gcdnum := 1
-
-	for i := 1; i <= nb1 && i <= nb2; i++ {
-		if nb1%i == 0 && nb2%i == 0 {
-			gcdnum = i
-		}
-	}
-	return gcdnum
 }
 
 // NVector is a vector with a norm of 1
