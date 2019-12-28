@@ -32,8 +32,15 @@ func Run(fileName string, steps, describeEvery int) (int, error) {
 	}
 
 	describe(ch, 0)
+	part1(ch, steps, describeEvery)
 
-	// do N steps
+	totalEnergy := ch.totalEnergy()
+	fmt.Printf("Total energy after %v steps: %v\n", steps, totalEnergy)
+
+	return totalEnergy, nil
+}
+
+func part1(ch challenge, steps, describeEvery int) {
 	for i := 1; i <= steps; i++ {
 		ch.computeVelocities()
 		ch.applyVelocities()
@@ -41,11 +48,6 @@ func Run(fileName string, steps, describeEvery int) (int, error) {
 			describe(ch, i)
 		}
 	}
-
-	totalEnergy := ch.totalEnergy()
-	fmt.Printf("Total energy after %v steps: %v\n", steps, totalEnergy)
-
-	return totalEnergy, nil
 }
 
 func describe(chal challenge, step int) {
