@@ -15,6 +15,7 @@ import (
 	"adventofcode2019/day11"
 	"adventofcode2019/day12"
 	"adventofcode2019/day13"
+	"adventofcode2019/day14"
 	"flag"
 	"fmt"
 )
@@ -38,7 +39,7 @@ func main() {
 
 	// common flags
 	fptr := flag.String("file", "input.txt", "file path to read from")
-	dayptr := flag.Int("day", 13, "run the solution for day XX")
+	dayptr := flag.Int("day", 14, "run the solution for day XX")
 	flag.Parse()
 
 	switch *dayptr {
@@ -91,6 +92,10 @@ func main() {
 		shareResult(result)
 	case 13:
 		result, err := day13.Run(*fptr)
+		common.CheckError(err)
+		shareResult(result)
+	case 14:
+		result, err := day14.Run(*fptr)
 		common.CheckError(err)
 		shareResult(result)
 	}
