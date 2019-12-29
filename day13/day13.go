@@ -58,7 +58,7 @@ func Run(filepath string) (int, error) {
 				// once loaded, don't send a move at score reception but when
 				// receiving new position of ball
 				if !g.loaded {
-					sendMove(g, in)
+					go sendMove(g, in)
 				}
 				g.setScore(info)
 			} else {
@@ -67,7 +67,7 @@ func Run(filepath string) (int, error) {
 				// if we receive a ball position and the game is loaded...
 				// send a move
 				if t == ball && g.loaded {
-					sendMove(g, in)
+					go sendMove(g, in)
 				}
 			}
 		case <-quit:
@@ -85,9 +85,7 @@ func Run(filepath string) (int, error) {
 func sendMove(g game, in chan int) {
 	joystickMove := g.guessPaddleMove()
 	fmt.Printf("Move: %v\n", joystickMove)
-	go func() {
-		in <- int(joystickMove)
-	}()
+	in <- int(joystickMove)
 }
 
 var (
