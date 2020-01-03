@@ -62,6 +62,12 @@ func Gcd(a, b int) int {
 	}
 }
 
+// Eucl is Euclidean division:
+// Eucl(a, b) = (q, r) with b = a * q + r
+func Eucl(a, b int) (int, int) {
+	return (a - a%b) / b, a % b
+}
+
 // SliceIntEquals informs about []int equality
 func SliceIntEquals(a, b []int) bool {
 	if len(a) != len(b) {
