@@ -11,7 +11,7 @@ import (
 )
 
 // Run is the entryPoint of this day14 module
-func Run(fileName string) (int, error) {
+func Run(fileName string) (uint64, error) {
 	f := common.OpenFile(fileName)
 	defer common.CloseFile(f)
 
@@ -32,10 +32,49 @@ func Run(fileName string) (int, error) {
 
 	fmt.Printf("Book:\n%v\n", book)
 
-	return book.howMuchOfThatToGetIngredients(ore, ingredients{fuel: 1})
+	trillion := uint64(1000000000000)
+
+	nbOreFor1Fuel, _ := book.howMuchOfThatToGetIngredients(ore, ingredients{fuel: 1})
+
+	// don't use +1 loops, use your brain ! dichotomy process is often key to
+	// solve absurd numbers.
+	// - grind to the limit using something like a 10x growth
+	// - when limit is hit, simply /10 and you've got a min and a max
+	// then process this range by dichotomy
+	// we know that for 1 fuel we use more than necessary and those components
+	// can be used for other fuels so we know that we will generate more fuel than trillion/nbOreFor1Fuel
+	var max uint64 = trillion / nbOreFor1Fuel
+	for {
+		nbOre, _ := book.howMuchOfThatToGetIngredients(ore, ingredients{fuel: max})
+		if nbOre < trillion {
+			max = 10 * max
+		} else {
+			break
+		}
+	}
+
+	min := max / 10
+
+	// dichotomy start here
+	var attempt uint64 = 1
+	for {
+		attempt = (max + min) / 2
+		color.Blue("attempt:%v", attempt)
+		nbOre, _ := book.howMuchOfThatToGetIngredients(ore, ingredients{fuel: attempt})
+		if nbOre > trillion {
+			max = attempt
+		} else {
+			min = attempt
+		}
+
+		if (max+min)/2 == attempt {
+			break
+		}
+	}
+	return attempt, nil
 }
 
-type ingredients map[component]int
+type ingredients map[component]uint64
 
 func (ings ingredients) Equals(other ingredients) bool {
 	if len(ings) != len(other) {
@@ -69,10 +108,11 @@ func (bk book) String() string {
 		str.WriteString(f.String())
 		str.WriteString("\n")
 	}
+	str.WriteString(fmt.Sprintf("%v", bk.componentWeight))
 	return str.String()
 }
 
-func (bk book) howMuchOfThatToGetIngredients(cmp component, needed ingredients) (int, error) {
+func (bk book) howMuchOfThatToGetIngredients(cmp component, needed ingredients) (uint64, error) {
 
 	neededCopy := needed.copy()
 
@@ -90,12 +130,12 @@ func (bk book) howMuchOfThatToGetIngredients(cmp component, needed ingredients) 
 			return 0, err
 		}
 		fmt.Printf("found formulae: %v\n", f)
-		ratio, rmd := common.Eucl(quantity, f.output.quantity)
+		ratio, rmd := common.EuclU64(quantity, uint64(f.output.quantity))
 		// replace this component by its inputs in proportions
 		if ratio != 0 {
 			fmt.Printf("ratio:%v, rmd:%v\n", ratio, rmd)
 			for _, input := range f.inputs {
-				neededCopy[input.component] += input.quantity * ratio
+				neededCopy[input.component] += uint64(input.quantity) * ratio
 			}
 			newValue := neededCopy[comp] - quantity + rmd
 			if newValue == 0 {
@@ -113,6 +153,12 @@ func (bk book) howMuchOfThatToGetIngredients(cmp component, needed ingredients) 
 		return bk.howMuchOfThatToGetIngredients(cmp, neededCopy)
 	}
 
+	// here we can't reduce it more
+	if len(neededCopy) == 1 {
+		// we should be with only ORE now
+		return neededCopy[cmp], nil
+	}
+
 	color.Red("deadend ! have to make a deal")
 	// here we can't reduce it more without making a deal.
 	// deal one component at a time
@@ -124,10 +170,6 @@ func (bk book) howMuchOfThatToGetIngredients(cmp component, needed ingredients) 
 	}
 
 	fmt.Printf("after deal: %v\n", neededCopy)
-	if len(neededCopy) == 1 {
-		return neededCopy[cmp], nil
-	}
-
 	fmt.Println("after deal: try another pass")
 	// make another pass
 	return bk.howMuchOfThatToGetIngredients(cmp, neededCopy)
@@ -146,8 +188,8 @@ func (bk book) getFormulaeProducing(comp component) (formulae, error) {
 // I think the one that will free up a lot more other component is good choice
 // to avoid multiple deals for the same component.
 func (bk book) findTheDeal(ings ingredients) (component, formulae) {
-	var deal component = component("")
-	var dealFormulae formulae = formulae{}
+	var deal component
+	var dealFormulae formulae
 	maxInput := -1
 
 	for c := range ings {
@@ -240,7 +282,7 @@ func parseDoseList(line string) ([]dose, error) {
 }
 
 type dose struct {
-	quantity  int
+	quantity  uint64
 	component component
 }
 
@@ -258,7 +300,7 @@ func parseDose(part string) (dose, error) {
 	}
 	compo := component(matches[2])
 
-	return dose{q, compo}, nil
+	return dose{uint64(q), compo}, nil
 }
 
 type component string

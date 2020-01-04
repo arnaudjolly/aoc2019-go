@@ -68,6 +68,11 @@ func Eucl(a, b int) (int, int) {
 	return (a - a%b) / b, a % b
 }
 
+// EuclU64 is Euclidean division for larger numbers
+func EuclU64(a, b uint64) (uint64, uint64) {
+	return (a - a%b) / b, a % b
+}
+
 // SliceIntEquals informs about []int equality
 func SliceIntEquals(a, b []int) bool {
 	if len(a) != len(b) {
