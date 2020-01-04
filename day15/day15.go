@@ -5,9 +5,11 @@ import (
 	"adventofcode2019/intcode"
 	"bufio"
 	"fmt"
-	"github.com/fatih/color"
 	"strconv"
 	"strings"
+
+	"github.com/RyanCarrier/dijkstra"
+	"github.com/fatih/color"
 )
 
 // Run is the entrypoint of day15 exercice
@@ -47,24 +49,90 @@ func Run(filepath string) (int, error) {
 	out := make(chan int)
 	quit := make(chan int)
 	go p.Run(in, out, quit)
-	g.findOxygenSystem(make([]direction, 0), in, out)
-
+	g.walkTheMap(in, out)
 	g.printGrid()
 
-	return 0, nil
+	graph, verticesIndices := g.buildGraph()
+
+	best, err := graph.Shortest(verticesIndices[origin], verticesIndices[g.oxygenSystemPosition])
+	return int(best.Distance), err
 }
 
 var (
-	bgW = color.New(color.BgWhite, color.FgBlack)
-	bgB = color.New(color.BgBlack, color.FgWhite)
-	bgR = color.New(color.BgRed, color.FgBlack)
-	bgG = color.New(color.BgGreen, color.FgWhite)
+	blackOnCyan   = color.New(color.BgCyan, color.FgBlack)
+	blackOnRed    = color.New(color.BgRed, color.FgBlack)
+	blackOnYellow = color.New(color.BgYellow, color.FgBlack)
+	blackOnWhite  = color.New(color.BgWhite, color.FgBlack)
+	whiteOnBlack  = color.New(color.BgBlack, color.FgWhite)
+	whiteOnGreen  = color.New(color.BgGreen, color.FgWhite)
 )
 
+type directionStack []direction
+
+func (s directionStack) Empty() bool      { return len(s) == 0 }
+func (s directionStack) Peek() direction  { return s[len(s)-1] }
+func (s *directionStack) Put(i direction) { (*s) = append((*s), i) }
+func (s *directionStack) Pop() direction {
+	d := (*s)[len(*s)-1]
+	(*s) = (*s)[:len(*s)-1]
+	return d
+}
+
 type game struct {
-	grid        map[point]tile
-	droid       point
-	commandSent direction
+	grid                 map[point]tile
+	droid                point
+	oxygenSystemPosition point
+	commandSent          direction
+}
+
+func (g *game) buildGraph() (*dijkstra.Graph, map[point]int) {
+	graph := dijkstra.NewGraph()
+
+	minX, maxX := 1, -1
+	minY, maxY := 1, -1
+	for p := range g.grid {
+		minX, maxX = common.MinInt(minX, p.x), common.MaxInt(maxX, p.x)
+		minY, maxY = common.MinInt(minY, p.y), common.MaxInt(maxY, p.y)
+	}
+
+	shouldHandleTile := func(t tile) bool { return t == visited || t == oxygenSystem }
+
+	verticesIndexes := make(map[point]int)
+	vertexID := func(indices map[point]int) func(point) int {
+		return func(pt point) int {
+			id, found := indices[pt]
+			if !found {
+				id = graph.AddNewVertex().ID
+				indices[pt] = id
+			}
+			return id
+		}
+	}(verticesIndexes)
+
+	for y := maxY; y >= minY; y-- {
+		for x := minX; x <= maxX; x++ {
+			p := point{x, y}
+			t := g.tileAt(p)
+
+			if shouldHandleTile(t) {
+				pID := vertexID(p)
+
+				// add arcs for each connected cells
+				for _, cell := range [4]point{
+					p.northTile(),
+					p.eastTile(),
+					p.southTile(),
+					p.westTile(),
+				} {
+					if shouldHandleTile(g.tileAt(cell)) {
+						graph.AddArc(pID, vertexID(cell), 1)
+					}
+				}
+			}
+		}
+	}
+
+	return graph, verticesIndexes
 }
 
 func (g *game) tileAt(p point) tile {
@@ -75,88 +143,55 @@ func (g *game) tileAt(p point) tile {
 	return t
 }
 
-func (g *game) findOxygenSystem(path []direction, in, out chan int) ([]direction, bool) {
-	g.printGrid()
-	if g.tileAt(g.droid.northTile()) == unvisited {
-		result, found := g.tryInDirection(north, path, in, out)
-		if found {
-			return result, found
+func (g *game) walkTheMap(in, out chan int) {
+	dirs := g.directions()
+	for !dirs.Empty() {
+		dir := dirs.Pop()
+		t := g.handleDirection(dir, in, out)
+		if t != wall {
+			g.walkTheMap(in, out)
+			g.handleDirection(dir.revert(), in, out)
 		}
 	}
-	if g.tileAt(g.droid.eastTile()) == unvisited {
-		result, found := g.tryInDirection(east, path, in, out)
-		if found {
-			return result, found
-		}
-	}
-	if g.tileAt(g.droid.westTile()) == unvisited {
-		result, found := g.tryInDirection(west, path, in, out)
-		if found {
-			return result, found
-		}
-	}
-	if g.tileAt(g.droid.southTile()) == unvisited {
-		result, found := g.tryInDirection(south, path, in, out)
-		if found {
-			return result, found
-		}
-	}
-	return path, false
 }
 
-func (g *game) tryInDirection(dir direction, path []direction, in, out chan int) ([]direction, bool) {
-	fmt.Printf("trying to visit %v of %v\n", dir, g.droid)
-	g.commandSent = dir
+func (g *game) handleDirection(d direction, in, out chan int) tile {
+	g.commandSent = d
 	in <- int(g.commandSent)
 	t := tile(<-out)
 	g.handle(t)
-	fmt.Printf("sent:%v, received:%v, afterHandlePosition:%v\n", g.commandSent, t, g.droid)
-	if t == wall {
-		// finished, we hit a wall!
-		return path, false
-	}
-	if t == oxygenSystem {
-		// congrats, one path to the system has been discovered !
-		return append(path, dir), true
-	}
+	return t
+}
 
-	// oh! a new undiscovered tile has been found, droid is already at good position
-	// let's find the solution from this point
-	dirSolution, dirFound := g.findOxygenSystem(make([]direction, 0), in, out)
-	if dirFound {
-		res := make([]direction, len(path)+len(dirSolution))
-		copy(res, path)
-		for idx, d := range dirSolution {
-			res[len(path)+idx] = d
-		}
-		return res, true
+func (g *game) directions() directionStack {
+	var result directionStack
+	if g.tileAt(g.droid.southTile()) == unvisited {
+		result.Put(south)
 	}
-	// no solution found from the new point, droid should backtrack one step
-	g.backtrack(dir, in, out)
-
-	return path, false
+	if g.tileAt(g.droid.eastTile()) == unvisited {
+		result.Put(east)
+	}
+	if g.tileAt(g.droid.westTile()) == unvisited {
+		result.Put(west)
+	}
+	if g.tileAt(g.droid.northTile()) == unvisited {
+		result.Put(north)
+	}
+	return result
 }
 
 func (g *game) handle(t tile) {
-	fmt.Printf("received: %v for position:%v and command:%v\n", t, g.droid, g.commandSent)
 	tileToMark := g.droid.destinationOfDirection(g.commandSent)
 	switch t {
 	case wall:
-		g.grid[tileToMark] = wall
+		g.markPointAs(tileToMark, wall)
 	case oxygenSystem:
 		g.moveDroidTo(tileToMark)
-		g.grid[tileToMark] = oxygenSystem
+		g.markPointAs(tileToMark, oxygenSystem)
 	case visited:
 		g.moveDroidTo(tileToMark)
-		g.grid[tileToMark] = visited
+		g.markPointAs(tileToMark, visited)
 	}
-}
-
-func (g *game) backtrack(dir direction, in, out chan int) {
-	fmt.Printf("backtracking %v...\n", dir)
-	g.commandSent = dir.revert()
-	in <- int(g.commandSent)
-	g.handle(tile(<-out))
 }
 
 func (g *game) moveDroidTo(dest point) {
@@ -165,41 +200,23 @@ func (g *game) moveDroidTo(dest point) {
 
 func (g *game) markPointAs(p point, t tile) {
 	g.grid[p] = t
+	if t == oxygenSystem {
+		g.oxygenSystemPosition = p
+	}
 }
 
 func (g *game) printGrid() {
 	fmt.Println("Grid:")
 	minX, maxX := 1, -1
 	minY, maxY := 1, -1
-
 	for p := range g.grid {
-		if p.x > maxX {
-			maxX = p.x
-		}
-		if p.x < minX {
-			minX = p.x
-		}
-		if p.y > maxY {
-			maxY = p.y
-		}
-		if p.y < minY {
-			minY = p.y
-		}
+		minX, maxX = common.MinInt(minX, p.x), common.MaxInt(maxX, p.x)
+		minY, maxY = common.MinInt(minY, p.y), common.MaxInt(maxY, p.y)
 	}
 
 	// ensure droid is on the map
-	if g.droid.x < minX {
-		minX = g.droid.x - 1
-	}
-	if g.droid.x > maxX {
-		maxX = g.droid.x + 1
-	}
-	if g.droid.y < minY {
-		minY = g.droid.y - 1
-	}
-	if g.droid.y > maxY {
-		maxY = g.droid.y + 1
-	}
+	minX, maxX = common.MinInt(minX, g.droid.x), common.MaxInt(maxX, g.droid.x)
+	minY, maxY = common.MinInt(minY, g.droid.y), common.MaxInt(maxY, g.droid.y)
 
 	for y := maxY; y >= minY; y-- {
 		for x := minX; x <= maxX; x++ {
@@ -208,15 +225,32 @@ func (g *game) printGrid() {
 			if !found {
 				tile = unvisited
 			}
+			col := g.colorOf(p)
 			if p == g.droid {
-				bgR.Print("D")
+				col.Print("D")
 			} else if p == origin {
-				bgR.Print("S")
+				col.Print("S")
 			} else {
-				fmt.Print(tile)
+				col.Print(tile)
 			}
 		}
 		fmt.Printf("\n")
+	}
+}
+
+func (g *game) colorOf(p point) *color.Color {
+	t := g.tileAt(p)
+	switch {
+	case t == oxygenSystem:
+		return whiteOnGreen
+	case p == origin || p == g.droid:
+		return blackOnCyan
+	case t == visited:
+		return blackOnWhite
+	case t == wall:
+		return blackOnYellow
+	default:
+		return blackOnRed
 	}
 }
 
@@ -225,15 +259,15 @@ type tile int
 func (t tile) String() string {
 	switch t {
 	case wall:
-		return bgW.Sprint("#")
+		return blackOnYellow.Sprint("#")
 	case visited:
-		return bgW.Sprint(".")
+		return blackOnWhite.Sprint(" ")
 	case unvisited:
-		return bgB.Sprint("?")
+		return whiteOnBlack.Sprint(" ")
 	case oxygenSystem:
-		return bgG.Sprint("X")
+		return whiteOnGreen.Sprint("X")
 	default:
-		return bgR.Sprintf("%1v", int(t))
+		return blackOnRed.Sprintf("%1v", int(t))
 	}
 }
 
@@ -257,7 +291,7 @@ func (d direction) String() string {
 	case east:
 		return "east"
 	default:
-		return bgR.Sprintf("unknown(%v)", int(d))
+		return blackOnRed.Sprintf("unknown(%v)", int(d))
 	}
 }
 
@@ -274,14 +308,6 @@ func (d direction) revert() direction {
 	default:
 		panic("reverting an unknown direction")
 	}
-}
-
-func revertPath(path []direction) []direction {
-	result := make([]direction, len(path))
-	for i, d := range path {
-		result[len(path)-1-i] = d.revert()
-	}
-	return result
 }
 
 const (

@@ -34,6 +34,22 @@ func AbsInt(i int) int {
 	return i
 }
 
+// MinInt returns the minimum of a and b
+func MinInt(a, b int) int {
+	if a-b <= 0 {
+		return a
+	}
+	return b
+}
+
+// MaxInt returns the minimum of a and b
+func MaxInt(a, b int) int {
+	if a-b >= 0 {
+		return a
+	}
+	return b
+}
+
 // Lcm2 is Least Common Multiple
 func Lcm2(a, b int) int {
 	return a * b / Gcd(a, b)
