@@ -52,10 +52,24 @@ func Run(filepath string) (int, error) {
 	g.walkTheMap(in, out)
 	g.printGrid()
 
-	graph, verticesIndices := g.buildGraph()
+	graph := g.buildGraph()
 
-	best, err := graph.Shortest(verticesIndices[origin], verticesIndices[g.oxygenSystemPosition])
-	return int(best.Distance), err
+	// part1
+	originID := graph.AddMappedVertex(origin.String())
+	oxygenID := graph.AddMappedVertex(g.oxygenSystemPosition.String())
+	best, err := graph.Shortest(originID, oxygenID)
+	if err != nil {
+		return 0, err
+	}
+	part1 := int(best.Distance)
+	fmt.Printf("part1 result: %v\n", part1)
+
+	// part2
+	maxMinDistance, err := g.maxMinDistanceFrom(g.oxygenSystemPosition)
+	if err != nil {
+		return 0, err
+	}
+	return maxMinDistance, nil
 }
 
 var (
@@ -85,7 +99,7 @@ type game struct {
 	commandSent          direction
 }
 
-func (g *game) buildGraph() (*dijkstra.Graph, map[point]int) {
+func (g *game) buildGraph() *dijkstra.Graph {
 	graph := dijkstra.NewGraph()
 
 	minX, maxX := 1, -1
@@ -95,28 +109,12 @@ func (g *game) buildGraph() (*dijkstra.Graph, map[point]int) {
 		minY, maxY = common.MinInt(minY, p.y), common.MaxInt(maxY, p.y)
 	}
 
-	shouldHandleTile := func(t tile) bool { return t == visited || t == oxygenSystem }
-
-	verticesIndexes := make(map[point]int)
-	vertexID := func(indices map[point]int) func(point) int {
-		return func(pt point) int {
-			id, found := indices[pt]
-			if !found {
-				id = graph.AddNewVertex().ID
-				indices[pt] = id
-			}
-			return id
-		}
-	}(verticesIndexes)
-
 	for y := maxY; y >= minY; y-- {
 		for x := minX; x <= maxX; x++ {
 			p := point{x, y}
 			t := g.tileAt(p)
 
-			if shouldHandleTile(t) {
-				pID := vertexID(p)
-
+			if t.isInternalCell() {
 				// add arcs for each connected cells
 				for _, cell := range [4]point{
 					p.northTile(),
@@ -124,15 +122,38 @@ func (g *game) buildGraph() (*dijkstra.Graph, map[point]int) {
 					p.southTile(),
 					p.westTile(),
 				} {
-					if shouldHandleTile(g.tileAt(cell)) {
-						graph.AddArc(pID, vertexID(cell), 1)
+					if g.tileAt(cell).isInternalCell() {
+						graph.AddMappedArc(p.String(), cell.String(), 1)
 					}
 				}
 			}
 		}
 	}
 
-	return graph, verticesIndexes
+	return graph
+}
+
+func (g *game) maxMinDistanceFrom(pt point) (int, error) {
+	graph := g.buildGraph()
+	// for each internal cell, find the min distance to oxygenSystem
+	// keep the max value for that
+	max := 0
+	ptID := graph.AddMappedVertex(pt.String())
+	for cell, t := range g.grid {
+		if t.isInternalCell() && cell != g.oxygenSystemPosition {
+			cellID := graph.AddMappedVertex(cell.String())
+			dist, err := graph.Shortest(cellID, ptID)
+			if err != nil {
+				g.markPointAs(pt, tile(9))
+				g.printGrid()
+				fmt.Println(graph)
+				return 0, fmt.Errorf("from point %v: %v", pt, err)
+			}
+			max = common.MaxInt(max, int(dist.Distance))
+		}
+	}
+
+	return max, nil
 }
 
 func (g *game) tileAt(p point) tile {
@@ -271,6 +292,10 @@ func (t tile) String() string {
 	}
 }
 
+func (t tile) isInternalCell() bool {
+	return t == visited || t == oxygenSystem
+}
+
 const (
 	unvisited    = tile(-1)
 	wall         = tile(0)
@@ -320,6 +345,10 @@ const (
 type point struct {
 	x int
 	y int
+}
+
+func (p point) String() string {
+	return fmt.Sprintf("(%v %v)", p.x, p.y)
 }
 
 var origin = point{0, 0}
