@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-var pattern = [4]int{0, 1, 0, -1}
-
 // Impl contains all details for Flawed Frequency Transmission
 type Impl struct {
 	input  []int
@@ -50,20 +48,9 @@ func (impl *Impl) String() string {
 	return fmt.Sprintf("{ len: %v, offset: %v}", impl.Size(), impl.offset)
 }
 
-// StringOfFirstN returns a string containing the first n digits of input
+// Result returns a string containing the first n digits
 // n is clamped to fit the max length of result
-func (impl *Impl) StringOfFirstN(n int) string {
-	size := common.MinInt(len(impl.input), n)
-	var builder strings.Builder
-	for i := 0; i < size; i++ {
-		builder.WriteString(strconv.Itoa(impl.input[i]))
-	}
-	return builder.String()
-}
-
-// StringOfFirstNWithOffset returns a string containing the first n digits
-// n is clamped to fit the max length of result
-func (impl *Impl) StringOfFirstNWithOffset(n int) string {
+func (impl *Impl) Result(n int) string {
 	size := common.MinInt(len(impl.input)-impl.offset, n)
 	var builder strings.Builder
 	for _, digit := range impl.input[impl.offset : impl.offset+size] {
@@ -78,28 +65,18 @@ func (impl *Impl) Size() int {
 }
 
 // ProcessNSteps processes N step of phases
-func (impl *Impl) ProcessNSteps(n int) {
+func (impl *Impl) ProcessNSteps(n int) string {
 	for i := 0; i < n; i++ {
 		color.Cyan("iteration: %v\n", i)
 		impl.processStep()
 	}
+	return impl.Result(8)
 }
 
 func (impl *Impl) processStep() {
-	res := make([]int, impl.Size())
-	for i := impl.offset; i < impl.Size(); i++ {
-		computationIdx := i
-		s := 0
-		for idx := impl.offset; idx < impl.Size(); idx++ {
-			coef := coefFromPattern(computationIdx, idx)
-			s += impl.input[idx] * coef
-		}
-		digit := common.AbsInt(s) % 10
-		res[i] = digit
+	// assuming offset is large enough to get only zeros and ones from the pattern
+	for i := impl.Size() - 2; i >= impl.offset; i-- {
+		digit := common.AbsInt(impl.input[i+1]+impl.input[i]) % 10
+		impl.input[i] = digit
 	}
-	copy(impl.input, res)
-}
-
-func coefFromPattern(computationIdx, idx int) int {
-	return pattern[((idx+1)/(computationIdx+1))%4]
 }

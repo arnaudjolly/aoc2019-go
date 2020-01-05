@@ -29,8 +29,7 @@ func Run(fileName string, steps int) (string, error) {
 
 	fmt.Printf("fft:%v\n", myFft)
 
-	myFft.ProcessNSteps(steps)
-	result := myFft.StringOfFirstNWithOffset(8)
+	result := myFft.ProcessNSteps(steps)
 
 	return result, nil
 }
