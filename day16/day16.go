@@ -4,6 +4,8 @@ import (
 	"adventofcode2019/common"
 	"adventofcode2019/fft"
 	"bufio"
+	"fmt"
+	"strings"
 )
 
 // Run is the entryPoint of this day16 module
@@ -19,13 +21,16 @@ func Run(fileName string, steps int) (string, error) {
 		return "", err
 	}
 
-	myFft, err := fft.New([]int{0, 1, 0, -1}, input)
+	realSignal := strings.Repeat(input, 10000)
+	myFft, err := fft.New(realSignal)
 	if err != nil {
 		return "", err
 	}
 
+	fmt.Printf("fft:%v\n", myFft)
+
 	myFft.ProcessNSteps(steps)
-	result := myFft.StringOfFirstN(8)
+	result := myFft.StringOfFirstNWithOffset(8)
 
 	return result, nil
 }
