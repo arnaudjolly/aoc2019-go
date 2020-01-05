@@ -93,9 +93,34 @@ func (sm *SpaceMap) Print() {
 // SumAlignmentParams answers part1 of problem
 func (sm *SpaceMap) SumAlignmentParams() int {
 	sum := 0
+	for pt, t := range sm.grid {
+		// intersection is a scaffold
+		if t != scaffold {
+			continue
+		}
+
+		// intersection can't be at edges
+		if pt.x == 0 || pt.x == sm.width-1 || pt.y == 0 || pt.y == sm.height-1 {
+			continue
+		}
+
+		if sm.grid[pt.northTile()] == scaffold &&
+			sm.grid[pt.southTile()] == scaffold &&
+			sm.grid[pt.eastTile()] == scaffold &&
+			sm.grid[pt.westTile()] == scaffold {
+			sum += pt.x * pt.y
+		}
+	}
 	return sum
 }
+
 type tile byte
+
+const (
+	space    = tile('.')
+	scaffold = tile('#')
+)
+
 type point struct {
 	x int
 	y int
