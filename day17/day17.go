@@ -36,6 +36,9 @@ func Run(filepath string) (int, error) {
 
 	createProgram := intcode.ProgramCreator(seq)
 	p := createProgram()
+	// override movement logic
+	// p.SetMemory(0, 2)
+	// in := make(chan int)
 	out := make(chan int)
 	quit := make(chan int)
 	go p.Run(nil, out, quit)
@@ -44,14 +47,38 @@ func Run(filepath string) (int, error) {
 	spacemap.PopulateFrom(out)
 	spacemap.Print()
 
+	// prepare functions A B C
+	cds := spacemap.robotCommands()
+	fmt.Printf("Commands(%v):\n %v\n", len(cds.String()), cds)
 	return spacemap.SumAlignmentParams(), nil
+}
+
+type orientation byte
+
+func (o orientation) String() string {
+	return string(byte(o))
+}
+
+const (
+	left  = orientation('L')
+	right = orientation('R')
+)
+
+type instruction struct {
+	turn   orientation
+	length int
+}
+
+func (i instruction) String() string {
+	return fmt.Sprintf("%v,%v", i.turn, i.length)
 }
 
 // SpaceMap contains all information on the map
 type SpaceMap struct {
-	grid   map[point]tile
-	width  int
-	height int
+	grid          map[point]tile
+	width         int
+	height        int
+	robotPosition point
 }
 
 // PopulateFrom populates the space map following information given by out values
@@ -59,17 +86,27 @@ func (sm *SpaceMap) PopulateFrom(out chan int) {
 	grid := make(map[point]tile)
 	x, y := 0, 0
 	maxX, maxY := -1, -1
+	lastSeen := 0
 	for d := range out {
 		switch d {
 		case '\n':
+			if lastSeen == '\n' {
+				break
+			}
 			x, y = 0, y+1
+			break
 		default:
 			maxX = common.MaxInt(maxX, x)
 			maxY = common.MaxInt(maxY, y)
 			p := point{x, y}
-			grid[p] = tile(d)
+			t := tile(d)
+			grid[p] = t
+			if t.isRobot() {
+				sm.robotPosition = p
+			}
 			x++
 		}
+		lastSeen = d
 	}
 	sm.grid = grid
 	sm.width = maxX + 1
@@ -114,12 +151,135 @@ func (sm *SpaceMap) SumAlignmentParams() int {
 	return sum
 }
 
+func (sm *SpaceMap) tileInDirection(f func(point, tile) point) func(point, tile) tile {
+	return func(p point, t tile) tile {
+		return sm.grid[f(p, t)]
+	}
+}
+
+func (sm *SpaceMap) robotCommands() commands {
+	robot := sm.robotPosition
+	robotTile := sm.grid[robot]
+
+	f := sm.tileInDirection(frontPoint)
+	l := sm.tileInDirection(leftPoint)
+	r := sm.tileInDirection(rightPoint)
+
+	frontTile := f(robot, robotTile)
+	leftTile := l(robot, robotTile)
+	rightTile := r(robot, robotTile)
+
+	if frontTile == scaffold || leftTile != scaffold && rightTile != scaffold {
+		panic("map problem: can't find an instruction beginning with turn left or right")
+	}
+
+	result := commands(make([]instruction, 0))
+	for !(leftTile == space && rightTile == space) {
+
+		// find orientation
+		instr := instruction{}
+		if leftTile == scaffold {
+			instr.turn = left
+		} else {
+			instr.turn = right
+		}
+
+		// advance
+		robotTile = robotTile.turn(instr.turn)
+		sm.grid[robot] = scaffold
+		for f(robot, robotTile) == scaffold {
+			instr.length++
+			robot = frontPoint(robot, robotTile)
+		}
+		leftTile = l(robot, robotTile)
+		rightTile = r(robot, robotTile)
+		result = append(result, instr)
+	}
+
+	return result
+}
+
+type commands []instruction
+
+func (cds commands) String() string {
+	var strb strings.Builder
+	for i, instr := range cds {
+		if i != 0 {
+			strb.WriteByte(',')
+		}
+		strb.WriteString(instr.String())
+	}
+	return strb.String()
+}
+
 type tile byte
 
 const (
-	space    = tile('.')
-	scaffold = tile('#')
+	space     = tile('.')
+	scaffold  = tile('#')
+	faceUp    = tile('^')
+	faceLeft  = tile('<')
+	faceRight = tile('>')
+	faceDown  = tile('v')
 )
+
+func (t tile) isRobot() bool {
+	return t == faceDown || t == faceLeft || t == faceRight || t == faceUp
+}
+
+func (t tile) turn(o orientation) tile {
+	switch t {
+	case faceUp:
+		if o == left {
+			return faceLeft
+		}
+		return faceRight
+	case faceDown:
+		if o == left {
+			return faceRight
+		}
+		return faceLeft
+	case faceLeft:
+		if o == left {
+			return faceDown
+		}
+		return faceUp
+	case faceRight:
+		if o == left {
+			return faceUp
+		}
+		return faceDown
+	default:
+		return t
+	}
+}
+
+func frontPoint(pt point, t tile) point {
+	if !t.isRobot() {
+		panic("not a robot tile")
+	}
+
+	switch t {
+	case faceUp:
+		return pt.northTile()
+	case faceDown:
+		return pt.southTile()
+	case faceLeft:
+		return pt.westTile()
+	case faceRight:
+		return pt.eastTile()
+	}
+
+	panic("messed up with tiles !")
+}
+
+func leftPoint(pt point, t tile) point {
+	return frontPoint(pt, t.turn(left))
+}
+
+func rightPoint(pt point, t tile) point {
+	return frontPoint(pt, t.turn(right))
+}
 
 type point struct {
 	x int
@@ -131,10 +291,10 @@ func (p point) String() string {
 }
 
 func (p point) northTile() point {
-	return point{x: p.x, y: p.y + 1}
+	return point{x: p.x, y: p.y - 1}
 }
 func (p point) southTile() point {
-	return point{x: p.x, y: p.y - 1}
+	return point{x: p.x, y: p.y + 1}
 }
 func (p point) eastTile() point {
 	return point{x: p.x + 1, y: p.y}
