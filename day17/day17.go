@@ -291,7 +291,7 @@ func (sm *SpaceMap) SumAlignmentParams() int {
 	return sum
 }
 
-func (sm *SpaceMap) tileInDirection(f func(point, tile) point) func(point, tile) tile {
+func (sm *SpaceMap) tileIn(f func(point, tile) point) func(point, tile) tile {
 	return func(p point, t tile) tile {
 		return sm.grid[f(p, t)]
 	}
@@ -301,9 +301,9 @@ func (sm *SpaceMap) robotCommands() commands {
 	robot := sm.robotPosition
 	robotTile := sm.grid[robot]
 
-	f := sm.tileInDirection(frontPoint)
-	l := sm.tileInDirection(leftPoint)
-	r := sm.tileInDirection(rightPoint)
+	f := sm.tileIn(frontOf)
+	l := sm.tileIn(leftOf)
+	r := sm.tileIn(rightOf)
 
 	frontTile := f(robot, robotTile)
 	leftTile := l(robot, robotTile)
@@ -329,7 +329,7 @@ func (sm *SpaceMap) robotCommands() commands {
 		sm.grid[robot] = scaffold
 		for f(robot, robotTile) == scaffold {
 			instr.length++
-			robot = frontPoint(robot, robotTile)
+			robot = frontOf(robot, robotTile)
 		}
 		leftTile = l(robot, robotTile)
 		rightTile = r(robot, robotTile)
@@ -435,7 +435,7 @@ func (t tile) turn(o orientation) tile {
 	}
 }
 
-func frontPoint(pt point, t tile) point {
+func frontOf(pt point, t tile) point {
 	if !t.isRobot() {
 		panic("not a robot tile")
 	}
@@ -454,12 +454,12 @@ func frontPoint(pt point, t tile) point {
 	panic("messed up with tiles !")
 }
 
-func leftPoint(pt point, t tile) point {
-	return frontPoint(pt, t.turn(left))
+func leftOf(pt point, t tile) point {
+	return frontOf(pt, t.turn(left))
 }
 
-func rightPoint(pt point, t tile) point {
-	return frontPoint(pt, t.turn(right))
+func rightOf(pt point, t tile) point {
+	return frontOf(pt, t.turn(right))
 }
 
 type point struct {
