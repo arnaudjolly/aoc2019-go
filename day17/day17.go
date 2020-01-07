@@ -177,7 +177,7 @@ func splitCommands(cds commands) splitterResult {
 			}
 
 			// check if the rest can be written in sequences of A, B and C
-			if routine, ok := rest.composedOf(a, b, c); ok {
+			if routine, ok := rest.composedOf(map[string]commands{"A": a, "B": b, "C": c}); ok {
 				result.mainRoutine = append(result.mainRoutine, routine...)
 				result.A = a
 				result.B = b
@@ -352,43 +352,25 @@ func (cds commands) String() string {
 	return strb.String()
 }
 
-func (cds commands) composedOf(A, B, C commands) ([]string, bool) {
+func (cds commands) composedOf(functions map[string]commands) ([]string, bool) {
 	result := make([]string, 0)
 	if len(cds) == 0 {
 		return result, true
 	}
-	matchA := len(A) > 0 && reflect.DeepEqual(A, cds[:len(A)])
-	if matchA {
-		if solution, ok := cds[len(A):].composedOf(A, B, C); ok {
-			result = append(result, "A")
-			if len(solution) > 0 {
-				result = append(result, solution...)
+
+	for f, fcommands := range functions {
+		matchF := len(fcommands) > 0 && reflect.DeepEqual(fcommands, cds[:len(fcommands)])
+		if matchF {
+			solution, ok := cds[len(fcommands):].composedOf(functions)
+			if ok {
+				result = append(result, f)
+				if len(solution) > 0 {
+					result = append(result, solution...)
+				}
+				return result, true
 			}
-			return result, true
+			return nil, false
 		}
-		return nil, false
-	}
-	matchB := len(B) > 0 && reflect.DeepEqual(B, cds[:len(B)])
-	if matchB {
-		if solution, ok := cds[len(B):].composedOf(A, B, C); ok {
-			result = append(result, "B")
-			if len(solution) > 0 {
-				result = append(result, solution...)
-			}
-			return result, true
-		}
-		return nil, false
-	}
-	matchC := len(C) > 0 && reflect.DeepEqual(C, cds[:len(C)])
-	if matchC {
-		if solution, ok := cds[len(C):].composedOf(A, B, C); ok {
-			result = append(result, "C")
-			if len(solution) > 0 {
-				result = append(result, solution...)
-			}
-			return result, true
-		}
-		return nil, false
 	}
 	return nil, false
 }
