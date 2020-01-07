@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Run is the entrypoint of day15 exercice
@@ -35,27 +36,78 @@ func Run(filepath string) (int, error) {
 		seq = append(seq, code)
 	}
 
+	// create a program instance to get the map and compute commands from it
 	createProgram := intcode.ProgramCreator(seq)
 	p := createProgram()
-	// override movement logic
-	// p.SetMemory(0, 2)
-	// in := make(chan int)
 	out := make(chan int)
 	quit := make(chan int)
 	go p.Run(nil, out, quit)
 
 	spacemap := SpaceMap{}
 	spacemap.PopulateFrom(out)
-	spacemap.Print()
+	<-quit
 
 	// prepare functions A B C
 	cds := spacemap.robotCommands()
 	fmt.Printf("Commands(%v):\n %v\n", len(cds.String()), cds)
-
 	res := splitCommands(cds)
 	fmt.Printf("Splitted:\nA:%v\nB:%v\nC:%v\nRoutine:%v\n", res.A, res.B, res.C, res.mainRoutine)
 
-	return spacemap.SumAlignmentParams(), nil
+	// now create the real instance to send
+	manual := createProgram()
+	// override movement logic
+	manual.SetMemory(0, 2)
+
+	in2 := make(chan int)
+	out2 := make(chan int)
+	quit2 := make(chan int)
+	go manual.Run(in2, out2, quit2)
+
+	// stack commands to send to the program
+	go send([]string{
+		// Main:
+		strings.Join(res.mainRoutine, ","),
+		// Function A:
+		res.A.String(),
+		// Function B:
+		res.B.String(),
+		// Function C:
+		res.C.String(),
+		// Continuous video feed?
+		"n",
+	}, in2)
+
+	// output everything the program send to us
+	go output(out2)
+	// make the main goroutine wait for termination of second program to stop
+	<-quit2
+
+	return 0, nil
+}
+
+func output(out chan int) {
+	for c := range out {
+		if c > 0xff {
+			// score is greater than a byte
+			fmt.Printf("Stardust: %v\n", c)
+		} else {
+			fmt.Print(string(c))
+		}
+	}
+}
+
+func send(strings []string, ch chan int) {
+	// wait a bit to make printed line be readable ;)
+	time.Sleep(50 * time.Millisecond)
+	for _, str := range strings {
+		fmt.Printf("%v\n", str)
+		for _, c := range str {
+			ch <- int(c)
+		}
+		ch <- int('\n')
+		// wait a bit to make printed line be readable ;)
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 type splitterResult struct {
@@ -66,41 +118,41 @@ type splitterResult struct {
 	C           commands
 }
 
+// brute force B and C based on length of A
 func splitCommands(cds commands) splitterResult {
 	found := false
+	// begin with A and B of size 1 and 0
 	sizeA, sizeB := 1, 1
 
 	var result splitterResult
 
 	for !found {
+		// reset routine for this try
 		result.mainRoutine = make([]string, 0)
+
 		a := cds[:sizeA]
 		result.mainRoutine = append(result.mainRoutine, "A")
 		rest := cds[sizeA:]
 
-		var b commands
-		if sizeA == sizeB {
-			// consume each A in front of rest
-			// and start B just after
-			for reflect.DeepEqual(a, rest[:sizeA]) {
-				result.mainRoutine = append(result.mainRoutine, "A")
-				rest = rest[sizeA:]
-			}
+		b := rest[:sizeB]
+		if len(b) != 0 {
+			result.mainRoutine = append(result.mainRoutine, "B")
+			rest = rest[sizeB:]
 		}
-		b = rest[:sizeB]
-		result.mainRoutine = append(result.mainRoutine, "B")
-		rest = rest[sizeB:]
 
+		// if b is too heavy to be stored in a function: try with a bigger A
 		if len(b.String()) > 20 {
 			sizeA++
 			sizeB = 1
 			continue
 		}
 
+		// but if a is too heavy... panic because you simply miss the solution or algo is not ok
 		if len(a.String()) > 20 {
 			panic("not found!!!!!!")
 		}
 
+		// repeat consuming each A and B until what remains has same length as before
 		for previous := 0; len(rest) != previous; previous = len(rest) {
 			// consume all A
 			for reflect.DeepEqual(a, rest[:sizeA]) {
@@ -114,14 +166,18 @@ func splitCommands(cds commands) splitterResult {
 			}
 		}
 
+		// with this A and B set
+		// try to add successive elements to build C
 		var c commands
 		for _, item := range rest {
 			c = append(c, item)
+			// stop here if c is too heavy to be stored in a function
 			if len(c.String()) > 20 {
 				break
 			}
-			routine, ok := rest.composedOf(a, b, c)
-			if ok {
+
+			// check if the rest can be written in sequences of A, B and C
+			if routine, ok := rest.composedOf(a, b, c); ok {
 				result.mainRoutine = append(result.mainRoutine, routine...)
 				result.A = a
 				result.B = b
@@ -130,6 +186,7 @@ func splitCommands(cds commands) splitterResult {
 				break
 			}
 		}
+		// next run, try with a bigger B
 		sizeB++
 	}
 
@@ -302,9 +359,7 @@ func (cds commands) composedOf(A, B, C commands) ([]string, bool) {
 	}
 	matchA := len(A) > 0 && reflect.DeepEqual(A, cds[:len(A)])
 	if matchA {
-		subCmd := cds[len(A):]
-		solution, ok := subCmd.composedOf(A, B, C)
-		if ok {
+		if solution, ok := cds[len(A):].composedOf(A, B, C); ok {
 			result = append(result, "A")
 			if len(solution) > 0 {
 				result = append(result, solution...)
@@ -315,9 +370,7 @@ func (cds commands) composedOf(A, B, C commands) ([]string, bool) {
 	}
 	matchB := len(B) > 0 && reflect.DeepEqual(B, cds[:len(B)])
 	if matchB {
-		subCmd := cds[len(B):]
-		solution, ok := subCmd.composedOf(A, B, C)
-		if ok {
+		if solution, ok := cds[len(B):].composedOf(A, B, C); ok {
 			result = append(result, "B")
 			if len(solution) > 0 {
 				result = append(result, solution...)
@@ -328,9 +381,7 @@ func (cds commands) composedOf(A, B, C commands) ([]string, bool) {
 	}
 	matchC := len(C) > 0 && reflect.DeepEqual(C, cds[:len(C)])
 	if matchC {
-		subCmd := cds[len(C):]
-		solution, ok := subCmd.composedOf(A, B, C)
-		if ok {
+		if solution, ok := cds[len(C):].composedOf(A, B, C); ok {
 			result = append(result, "C")
 			if len(solution) > 0 {
 				result = append(result, solution...)
