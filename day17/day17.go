@@ -5,6 +5,7 @@ import (
 	"adventofcode2019/intcode"
 	"bufio"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -50,7 +51,89 @@ func Run(filepath string) (int, error) {
 	// prepare functions A B C
 	cds := spacemap.robotCommands()
 	fmt.Printf("Commands(%v):\n %v\n", len(cds.String()), cds)
+
+	res := splitCommands(cds)
+	fmt.Printf("Splitted:\nA:%v\nB:%v\nC:%v\nRoutine:%v\n", res.A, res.B, res.C, res.mainRoutine)
+
 	return spacemap.SumAlignmentParams(), nil
+}
+
+type splitterResult struct {
+	cds         commands
+	mainRoutine []string
+	A           commands
+	B           commands
+	C           commands
+}
+
+func splitCommands(cds commands) splitterResult {
+	found := false
+	sizeA, sizeB := 1, 1
+
+	var result splitterResult
+
+	for !found {
+		result.mainRoutine = make([]string, 0)
+		a := cds[:sizeA]
+		result.mainRoutine = append(result.mainRoutine, "A")
+		rest := cds[sizeA:]
+
+		var b commands
+		if sizeA == sizeB {
+			// consume each A in front of rest
+			// and start B just after
+			for reflect.DeepEqual(a, rest[:sizeA]) {
+				result.mainRoutine = append(result.mainRoutine, "A")
+				rest = rest[sizeA:]
+			}
+		}
+		b = rest[:sizeB]
+		result.mainRoutine = append(result.mainRoutine, "B")
+		rest = rest[sizeB:]
+
+		if len(b.String()) > 20 {
+			sizeA++
+			sizeB = 1
+			continue
+		}
+
+		if len(a.String()) > 20 {
+			panic("not found!!!!!!")
+		}
+
+		for previous := 0; len(rest) != previous; previous = len(rest) {
+			// consume all A
+			for reflect.DeepEqual(a, rest[:sizeA]) {
+				result.mainRoutine = append(result.mainRoutine, "A")
+				rest = rest[sizeA:]
+			}
+			// consume all B
+			for reflect.DeepEqual(b, rest[:sizeB]) {
+				result.mainRoutine = append(result.mainRoutine, "B")
+				rest = rest[sizeB:]
+			}
+		}
+
+		var c commands
+		for _, item := range rest {
+			c = append(c, item)
+			if len(c.String()) > 20 {
+				break
+			}
+			routine, ok := rest.composedOf(a, b, c)
+			if ok {
+				result.mainRoutine = append(result.mainRoutine, routine...)
+				result.A = a
+				result.B = b
+				result.C = c
+				found = true
+				break
+			}
+		}
+		sizeB++
+	}
+
+	return result
 }
 
 type orientation byte
@@ -210,6 +293,53 @@ func (cds commands) String() string {
 		strb.WriteString(instr.String())
 	}
 	return strb.String()
+}
+
+func (cds commands) composedOf(A, B, C commands) ([]string, bool) {
+	result := make([]string, 0)
+	if len(cds) == 0 {
+		return result, true
+	}
+	matchA := len(A) > 0 && reflect.DeepEqual(A, cds[:len(A)])
+	if matchA {
+		subCmd := cds[len(A):]
+		solution, ok := subCmd.composedOf(A, B, C)
+		if ok {
+			result = append(result, "A")
+			if len(solution) > 0 {
+				result = append(result, solution...)
+			}
+			return result, true
+		}
+		return nil, false
+	}
+	matchB := len(B) > 0 && reflect.DeepEqual(B, cds[:len(B)])
+	if matchB {
+		subCmd := cds[len(B):]
+		solution, ok := subCmd.composedOf(A, B, C)
+		if ok {
+			result = append(result, "B")
+			if len(solution) > 0 {
+				result = append(result, solution...)
+			}
+			return result, true
+		}
+		return nil, false
+	}
+	matchC := len(C) > 0 && reflect.DeepEqual(C, cds[:len(C)])
+	if matchC {
+		subCmd := cds[len(C):]
+		solution, ok := subCmd.composedOf(A, B, C)
+		if ok {
+			result = append(result, "C")
+			if len(solution) > 0 {
+				result = append(result, solution...)
+			}
+			return result, true
+		}
+		return nil, false
+	}
+	return nil, false
 }
 
 type tile byte
